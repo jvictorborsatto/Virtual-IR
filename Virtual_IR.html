@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virtual IR</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#f0f2f5;--surface:#ffffff;--surface2:#f7f8fa;--surface3:#eef0f3;--border:#d0d5de;
+  --border2:#b8bfcc;--accent:#0066cc;--accent2:#7c3aed;--accent3:#15803d;
+  --accent4:#b45309;--danger:#c0392b;--warn:#c27200;--info:#1a6fba;
+  --text:#1a1d23;--text2:#3d4452;--text3:#7a8296;--text4:#a8b0c0;
+  --header-bg:#ffffff;--header-text:#1a1d23;--header-accent:#0066cc;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,.10),0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg:0 4px 16px rgba(0,0,0,.12),0 2px 4px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;display:flex;flex-direction:column}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:46px;border-bottom:2px solid var(--border);background:var(--header-bg);flex-shrink:0;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.logo{font-family:var(--mono);font-size:13px;color:var(--header-accent);letter-spacing:2px;display:flex;align-items:center;gap:10px;font-weight:700}
+.logo-icon{width:22px;height:22px;flex-shrink:0}
+.badge{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:2px 8px;border-radius:2px;border:1px solid var(--border2);color:var(--text3);background:var(--surface2)}
+
+/* ── LAYOUT ── */
+.layout{display:flex;flex:1;overflow:hidden}
+.sb{width:310px;min-width:310px;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.sb::-webkit-scrollbar{width:4px}
+.sb::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── SIDEBAR SECTIONS ── */
+.sec{border-bottom:1px solid var(--border);padding:10px 13px}
+.st{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.st::before{content:'';width:3px;height:3px;border-radius:50%;background:var(--accent);box-shadow:0 0 4px rgba(0,102,204,.4)}
+.st.green::before{background:var(--accent3)}
+.st.warn::before{background:var(--warn)}
+
+label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;font-weight:500}
+input[type=number],input[type=text],select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;transition:border-color .15s,box-shadow .15s;-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,102,204,.15)}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8296'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px}
+
+.f{margin-bottom:6px}
+input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;height:4px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 12px;border-radius:3px;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.5px;font-weight:600;transition:all .15s;text-transform:uppercase;white-space:nowrap}
+.bp{background:var(--accent);color:#fff}.bp:hover{background:#0052a3;box-shadow:0 2px 8px rgba(0,102,204,.3)}
+.bs{background:transparent;border:1px solid var(--border2);color:var(--text2)}.bs:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,102,204,.05)}
+.bg{background:var(--accent3);color:#fff}.bg:hover{background:#166534}
+.bd{background:var(--danger);color:#fff}.bd:hover{background:#991b1b}
+.bsm{padding:4px 9px;font-size:9px}
+.bfw{width:100%}
+.brow{display:flex;gap:6px}
+
+/* ── MODE BUTTON ── */
+.mode-btn{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:4px 10px;font-family:var(--mono);font-size:9px;color:var(--text2);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+.mode-btn:hover{background:var(--surface3);border-color:var(--border2)}
+.mode-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mode-btn .icon{font-size:11px}
+
+/* ── FUNCTIONAL GROUP CARDS ── */
+.fg-card{border:1px solid var(--border);border-radius:4px;padding:8px 10px;margin-bottom:6px;transition:border-color .15s,box-shadow .15s}
+.fg-card:hover{border-color:var(--border2);box-shadow:var(--shadow)}
+.fg-card.hidden{opacity:0.5;background:var(--surface2)}
+.fg-card.hidden .fg-name{text-decoration:line-through;color:var(--text3)}
+.fg-head{display:flex;align-items:center;gap:7px}
+.fg-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.fg-swatch.hidden-swatch{opacity:0.3}
+.fg-name{flex:1;font-family:var(--mono);font-size:10px;color:var(--text);font-weight:600}
+.fg-actions{display:flex;gap:3px;align-items:center}
+.fg-toggle{background:none;border:none;color:var(--text4);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .15s}
+.fg-toggle:hover{color:var(--accent)}
+.fg-toggle.hidden-toggle{color:var(--text4)}
+.fg-toggle.hidden-toggle:hover{color:var(--accent3)}
+.fg-rm{background:none;border:none;color:var(--text4);cursor:pointer;font-size:13px;padding:0 2px;line-height:1}
+.fg-rm:hover{color:var(--danger)}
+.fg-peaks-info{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px;line-height:1.5}
+.fg-intensity-row{display:flex;align-items:center;gap:6px;margin-top:5px}
+.fg-intensity-row label{margin:0;white-space:nowrap;font-size:10px;min-width:60px;color:var(--text2)}
+.fg-intensity-row input[type=range]{flex:1;height:3px}
+.fg-int-num{width:40px;min-width:40px;font-size:10px;padding:2px 4px;text-align:center}
+
+/* ── PEAK SHIFT ROW - LABEL ACIMA DA BARRA ── */
+.pk-shift-row{display:flex;flex-direction:column;gap:2px;margin-top:4px;padding-left:12px;border-left:2px solid var(--border2)}
+.pk-shift-row .pk-shift-header{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--text3)}
+.pk-shift-row .pk-shift-header .pk-mode-label{font-weight:600;color:var(--text2);font-size:10px}
+.pk-shift-row .pk-shift-controls{display:flex;align-items:center;gap:4px}
+.pk-shift-row .pk-shift-controls input[type=range]{flex:1;height:2px;min-width:80px}
+.pk-shift-row .pk-shift-controls .pk-shift-num{width:44px;min-width:44px;font-size:9px;padding:1px 3px;text-align:center;font-family:var(--mono);color:var(--text2)}
+.pk-shift-row .pk-shift-controls .pk-shift-reset{background:none;border:none;color:var(--text4);cursor:pointer;font-size:10px;padding:0 2px;line-height:1}
+.pk-shift-row .pk-shift-controls .pk-shift-reset:hover{color:var(--accent)}
+.pk-shift-row .pk-wn{font-weight:600;color:var(--text2);margin-right:4px}
+
+/* ── CANVAS AREA ── */
+.carea{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.ctbar{display:flex;align-items:center;justify-content:space-between;padding:5px 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;gap:8px;flex-wrap:wrap}
+.ctbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ctbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cinfo{font-family:var(--mono);font-size:9px;color:var(--text3);display:flex;gap:14px;flex-wrap:wrap}
+.cinfo span{color:var(--accent);font-weight:700}
+.cwrap{flex:1;overflow:auto;padding:16px;display:flex;align-items:flex-start;justify-content:center;background:var(--bg)}
+#irCanvas{background:#fff;border-radius:3px;box-shadow:var(--shadow-lg);display:block;border:1px solid var(--border)}
+
+/* ── NOTIFICATION ── */
+#notif{position:fixed;bottom:16px;right:16px;background:var(--surface);border:1px solid var(--accent3);border-radius:4px;padding:8px 14px;font-family:var(--mono);font-size:10px;color:var(--accent3);box-shadow:var(--shadow-lg);transform:translateY(8px);opacity:0;transition:all .25s;z-index:200;pointer-events:none;max-width:300px}
+#notif.show{transform:translateY(0);opacity:1}
+#notif.warn{border-color:var(--warn);color:var(--warn)}
+#notif.danger{border-color:var(--danger);color:var(--danger)}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center}
+.modal-bg.on{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px;width:820px;max-width:96vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal h3{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--accent);margin-bottom:14px;text-transform:uppercase;font-weight:700;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.modal-close{float:right;background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;margin-top:-6px;line-height:1}
+.modal-close:hover{color:var(--danger)}
+
+/* ── ABSORPTION TABLE ── */
+.atbl{width:100%;border-collapse:collapse;font-size:11px}
+.atbl th{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;background:var(--surface2);padding:7px 10px;text-align:left;border-bottom:2px solid var(--border);position:sticky;top:0}
+.atbl td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--mono);font-size:10px;vertical-align:middle}
+.atbl tr:hover td{background:var(--surface2)}
+.atbl .grp-color{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:middle}
+.itx{font-size:10px;color:var(--text3);line-height:1.55}
+
+/* Add Functional Group Panel */
+.fg-picker{display:grid;grid-template-columns:1fr 1fr;gap:5px;max-height:320px;overflow-y:auto;margin-top:6px}
+.fg-picker::-webkit-scrollbar{width:3px}
+.fg-picker::-webkit-scrollbar-thumb{background:var(--border2)}
+.fg-opt{padding:5px 8px;border:1px solid var(--border);border-radius:3px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text2);transition:all .15s;display:flex;align-items:center;gap:6px;background:var(--surface)}
+.fg-opt:hover{border-color:var(--accent);color:var(--accent);background:#e8f0fb}
+.fg-opt .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.fg-opt-dim{opacity:0.5;cursor:not-allowed}
+.fg-opt-sel{border-color:var(--accent);background:#e8f0fb}
+.div{height:1px;background:var(--border);margin:7px 0}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 6 Q5 6 6 14 Q7 18 9 18 Q11 18 12 10 Q13 5 15 5 Q17 5 18 11 Q19 15 20 15" stroke="#0066cc" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+        <path d="M2 19 L20 19" stroke="#b8bfcc" stroke-width="0.8"/>
+      </svg>
+    </div>
+    VIRTUAL IR
+  </div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <button class="btn bs bsm" onclick="openAbsTable()">📋 ABSORPTION TABLE</button>
+    <button class="btn bs bsm" onclick="exportPNG()">⬇ PNG</button>
+    <button class="btn bs bsm" onclick="exportCSV()">⬇ CSV</button>
+    <div class="badge">VIRTUAL IR</div>
+    <div class="badge">v1.0</div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text3);padding-left:6px;border-left:1px solid var(--border)">© <span style="color:var(--text2);font-weight:600">João Victor Basolli Borsatto</span> · 2026</div>
+  </div>
+</header>
+
+<div class="layout">
+
+<!-- ══════════════════════════════════════════════════
+     LEFT SIDEBAR
+══════════════════════════════════════════════════ -->
+<div class="sb">
+
+  <!-- FUNCTIONAL GROUPS -->
+  <div class="sec">
+    <div class="st green">Functional Groups / Bonds</div>
+    <div id="fgList"></div>
+    <button class="btn bs bsm bfw" style="margin-top:4px" onclick="openAddFG()">+ ADD FUNCTIONAL GROUP</button>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:center;margin-top:4px" id="fgCount">0 groups active</div>
+  </div>
+
+  <!-- SIGNAL QUALITY -->
+  <div class="sec">
+    <div class="st">Signal Quality</div>
+    <div class="f">
+      <label>Noise / S·N⁻¹: <span id="noiseL" style="color:var(--accent)">0.3</span>%</label>
+      <input type="range" id="irNoise" min="0" max="8" step="0.1" value="0.3" oninput="document.getElementById('noiseL').textContent=this.value;drawIR()">
+    </div>
+    <div class="f">
+      <label>Baseline slope: <span id="slopeL" style="color:var(--accent)">0</span>%</label>
+      <input type="range" id="irSlope" min="-5" max="10" step="0.5" value="0" oninput="document.getElementById('slopeL').textContent=this.value;drawIR()">
+    </div>
+    <div class="f">
+      <label>Peak width factor: <span id="widthL" style="color:var(--accent)">1.0</span>×</label>
+      <input type="range" id="irWidth" min="0.4" max="3.0" step="0.1" value="1.0" oninput="document.getElementById('widthL').textContent=this.value;drawIR()">
+    </div>
+  </div>
+
+  <!-- SPECTRUM DISPLAY -->
+  <div class="sec">
+    <div class="st">Spectrum Display</div>
+    <div class="f"><label>Chart Title</label><input type="text" id="irTitle" value="IR Spectrum" oninput="drawIR()"></div>
+    <div class="f"><label>Y axis label</label><input type="text" id="irYLabel" value="Transmittance (%)" oninput="drawIR()"></div>
+    <div class="f" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="showAnnot" style="width:13px;height:13px;accent-color:var(--accent)">
+      <label for="showAnnot" style="margin:0;cursor:pointer;font-size:11px">Show peak labels</label>
+    </div>
+    <div class="f" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="showGrid" checked style="width:13px;height:13px;accent-color:var(--accent)">
+      <label for="showGrid" style="margin:0;cursor:pointer;font-size:11px">Show grid</label>
+    </div>
+    <div class="f" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="showWavenum" checked style="width:13px;height:13px;accent-color:var(--accent)">
+      <label for="showWavenum" style="margin:0;cursor:pointer;font-size:11px">Show wavenumber on peaks</label>
+    </div>
+  </div>
+
+  <!-- GENERATE -->
+  <div class="sec">
+    <button class="btn bp bfw" onclick="drawIR()">▶ UPDATE SPECTRUM</button>
+  </div>
+
+</div><!-- /sb -->
+
+<!-- ══════════════════════════════════════════════════
+     MAIN CANVAS AREA
+══════════════════════════════════════════════════ -->
+<div class="carea">
+  <div class="ctbar">
+    <div class="ctbar-left">
+      <div class="cinfo">
+        <span id="infoGroups">Groups: 0</span>
+        <span id="infoPeaks">Peaks: 0</span>
+        <span id="infoRange">4000–500 cm⁻¹</span>
+      </div>
+    </div>
+    <div class="ctbar-right">
+      <button class="mode-btn active" id="modeCombined" onclick="setMode('combined')">
+        <span class="icon">📊</span> Combined
+      </button>
+      <button class="mode-btn" id="modeSparate" onclick="setMode('sparate')">
+        <span class="icon">📈</span> Sparate
+      </button>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">IR Spectrum · Transmittance mode · 4000–1000 cm⁻¹</div>
+    </div>
+  </div>
+  <div class="cwrap">
+    <canvas id="irCanvas" width="1100" height="560"></canvas>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: ABSORPTION TABLE
+══════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modalAbs">
+  <div class="modal" style="width:860px">
+    <h3>IR Absorption Reference Table <button class="modal-close" onclick="document.getElementById('modalAbs').classList.remove('on')">✕</button></h3>
+    <div id="absTableContent"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: ADD FUNCTIONAL GROUP
+══════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modalAddFG">
+  <div class="modal" style="width:500px">
+    <h3>Add Functional Group / Bond <button class="modal-close" onclick="document.getElementById('modalAddFG').classList.remove('on')">✕</button></h3>
+    <div class="itx" style="margin-bottom:10px">Select one or more functional groups/bonds to add to the spectrum:</div>
+    <div class="fg-picker" id="fgPicker"></div>
+    <div class="div"></div>
+    <button class="btn bp bfw" onclick="confirmAddFG()">+ ADD SELECTED</button>
+  </div>
+</div>
+
+<div id="notif"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// IR DATABASE — Functional groups / BONDS
+// ════════════════════════════════════════════════════════════════
+const IR_DB = [
+  // ═══════════════════════════════════════════════════════════════
+  // OXIGÊNIO
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'oh_free', name:'O–H (free)', shortName:'O–H free',
+    color:'#e63946',
+    peaks:[
+      {wn:3620, intensity:0.85, label:'O–H stretch (free)', type:'stretch'},
+    ]
+  },
+  {
+    id:'oh_alcohol', name:'O–H (alcohol)', shortName:'O–H alcohol',
+    color:'#ff6b6b',
+    peaks:[
+      {wn:3350, intensity:0.90, label:'O–H stretch (alcohol, broad)', type:'stretch, broad'},
+    ]
+  },
+  {
+    id:'co_alcohol', name:'C–O (alcohol)', shortName:'C–O alcohol',
+    color:'#ff6b6b',
+    peaks:[
+      {wn:1050, intensity:0.70, label:'C–O stretch (alcohol)', type:'stretch'},
+    ]
+  },
+  {
+    id:'oh_phenol', name:'O–H (phenol)', shortName:'O–H phenol',
+    color:'#d62828',
+    peaks:[
+      {wn:3400, intensity:0.75, label:'O–H stretch (phenol, broad)', type:'stretch, broad'},
+    ]
+  },
+  {
+    id:'co_phenol', name:'C–O (phenol)', shortName:'C–O phenol',
+    color:'#d62828',
+    peaks:[
+      {wn:1220, intensity:0.70, label:'C–O stretch (phenol)', type:'stretch'},
+    ]
+  },
+  {
+    id:'oh_acid', name:'O–H (carboxylic acid)', shortName:'O–H acid',
+    color:'#c1121f',
+    peaks:[
+      {wn:3100, intensity:0.75, label:'O–H stretch (acid, very broad)', type:'stretch, very broad'},
+      {wn:930,  intensity:0.50, label:'O–H bend (acid)', type:'out-of-plane bend'},
+    ]
+  },
+  {
+    id:'co_acid_carbonyl', name:'C=O (carboxylic acid)', shortName:'C=O acid',
+    color:'#c1121f',
+    peaks:[
+      {wn:1710, intensity:1.00, label:'C=O stretch (acid)', type:'stretch'},
+    ]
+  },
+  {
+    id:'co_acid', name:'C–O (carboxylic acid)', shortName:'C–O acid',
+    color:'#c1121f',
+    peaks:[
+      {wn:1250, intensity:0.65, label:'C–O stretch (acid)', type:'stretch'},
+    ]
+  },
+  {
+    id:'ether', name:'C–O–C (ether)', shortName:'Ether',
+    color:'#00897b',
+    peaks:[
+      {wn:1110, intensity:0.70, label:'C–O–C asym. stretch', type:'asymmetric stretch'},
+    ]
+  },
+  {
+    id:'co_single', name:'C–O (alcohol/ether)', shortName:'C–O (alc/éter)',
+    color:'#00897b',
+    peaks:[
+      {wn:1075, intensity:0.75, label:'C–O stretch', type:'stretch'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // CARBONILA E DERIVADOS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'coo_', name:'COO⁻ (carboxylate)', shortName:'COO⁻',
+    color:'#e07a5f',
+    peaks:[
+      {wn:1560, intensity:0.95, label:'COO⁻ asym. stretch', type:'asymmetric stretch'},
+      {wn:1400, intensity:0.80, label:'COO⁻ sym. stretch', type:'symmetric stretch'},
+    ]
+  },
+  {
+    id:'acid_chloride', name:'C=O (acid chloride)', shortName:'Acid chloride',
+    color:'#d90429',
+    peaks:[
+      {wn:1800, intensity:1.00, label:'C=O stretch (acid chloride)', type:'stretch'},
+    ]
+  },
+  {
+    id:'co_ketone', name:'C=O (ketone)', shortName:'C=O ketone',
+    color:'#e65100',
+    peaks:[
+      {wn:1715, intensity:1.00, label:'C=O stretch (ketone)', type:'stretch'},
+    ]
+  },
+  {
+    id:'co_ester_carbonyl', name:'C=O (ester)', shortName:'C=O ester',
+    color:'#f57c00',
+    peaks:[
+      {wn:1735, intensity:1.00, label:'C=O stretch (ester)', type:'stretch'},
+    ]
+  },
+  {
+    id:'co_ester_ether', name:'C–O–C (ester)', shortName:'C–O–C ester',
+    color:'#f57c00',
+    peaks:[
+      {wn:1250, intensity:0.80, label:'C–O–C asym. stretch (ester)', type:'asymmetric stretch'},
+      {wn:1050, intensity:0.60, label:'C–O–C sym. stretch (ester)', type:'symmetric stretch'},
+    ]
+  },
+  {
+    id:'co_amide_carbonyl', name:'C=O (amide I)', shortName:'C=O amide I',
+    color:'#bf360c',
+    peaks:[
+      {wn:1670, intensity:1.00, label:'C=O stretch (amide I)', type:'stretch'},
+    ]
+  },
+  {
+    id:'co_amide_ii', name:'Amide II (N–H bend + C–N)', shortName:'Amide II',
+    color:'#bf360c',
+    peaks:[
+      {wn:1550, intensity:0.75, label:'N–H bend + C–N (amide II)', type:'bend/stretch'},
+    ]
+  },
+  {
+    id:'co_anhydride', name:'C=O (anhydride)', shortName:'C=O anhydride',
+    color:'#d84315',
+    peaks:[
+      {wn:1850, intensity:0.85, label:'C=O asym. stretch (anhydride)', type:'asymmetric stretch'},
+      {wn:1760, intensity:0.90, label:'C=O sym. stretch (anhydride)', type:'symmetric stretch'},
+    ]
+  },
+  {
+    id:'cho_co', name:'C=O (aldehyde)', shortName:'C=O aldehyde',
+    color:'#ff9800',
+    peaks:[
+      {wn:1725, intensity:1.00, label:'C=O stretch (aldehyde)', type:'stretch'},
+    ]
+  },
+  {
+    id:'cho_ch', name:'C–H (aldehyde)', shortName:'C–H aldehyde',
+    color:'#ff9800',
+    peaks:[
+      {wn:2820, intensity:0.45, label:'C–H stretch (aldehyde)', type:'stretch'},
+      {wn:2720, intensity:0.40, label:'C–H stretch (Fermi resonance)', type:'Fermi resonance'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // NITROGÊNIO
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'nh2', name:'N–H (primary amine/amide)', shortName:'N–H (NH₂)',
+    color:'#2196f3',
+    peaks:[
+      {wn:3370, intensity:0.70, label:'N–H asym. stretch', type:'asymmetric stretch'},
+      {wn:3290, intensity:0.65, label:'N–H sym. stretch', type:'symmetric stretch'},
+      {wn:1620, intensity:0.60, label:'N–H scissor', type:'scissoring'},
+    ]
+  },
+  {
+    id:'nh', name:'N–H (secondary amine)', shortName:'N–H (2°)',
+    color:'#1565c0',
+    peaks:[
+      {wn:3310, intensity:0.55, label:'N–H stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'cn_single', name:'C–N (amine)', shortName:'C–N amine',
+    color:'#9c27b0',
+    peaks:[
+      {wn:1090, intensity:0.45, label:'C–N stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'cn_double', name:'C=N (imine/oxime)', shortName:'C=N',
+    color:'#7b1fa2',
+    peaks:[
+      {wn:1650, intensity:0.55, label:'C=N stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'cn_triple', name:'C≡N (nitrile)', shortName:'C≡N nitrile',
+    color:'#6a1b9a',
+    peaks:[
+      {wn:2250, intensity:0.70, label:'C≡N stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'isocyanate', name:'N=C=O (isocyanate)', shortName:'N=C=O',
+    color:'#4a148c',
+    peaks:[
+      {wn:2270, intensity:0.75, label:'N=C=O stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'nitroso', name:'N=O (nitroso)', shortName:'N=O nitroso',
+    color:'#e53935',
+    peaks:[
+      {wn:1500, intensity:0.75, label:'N=O stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'no2', name:'NO₂ (nitro)', shortName:'NO₂',
+    color:'#f44336',
+    peaks:[
+      {wn:1540, intensity:0.95, label:'N=O asym. stretch (nitro)', type:'asymmetric stretch'},
+      {wn:1370, intensity:0.85, label:'N=O sym. stretch (nitro)', type:'symmetric stretch'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // CARBONO (Hidrocarbonetos)
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'ch_sp3', name:'C–H (sp³, alkyl)', shortName:'C–H sp³',
+    color:'#555555',
+    peaks:[
+      {wn:2960, intensity:0.80, label:'C–H asym. stretch (CH₃)', type:'asymmetric stretch'},
+      {wn:2920, intensity:0.85, label:'C–H asym. stretch (CH₂)', type:'asymmetric stretch'},
+      {wn:2870, intensity:0.65, label:'C–H sym. stretch (CH₃)', type:'symmetric stretch'},
+      {wn:2850, intensity:0.70, label:'C–H sym. stretch (CH₂)', type:'symmetric stretch'},
+      {wn:1460, intensity:0.55, label:'C–H bend (CH₂/CH₃)', type:'scissoring/asymmetric bend'},
+      {wn:1380, intensity:0.50, label:'C–H sym. bend (CH₃)', type:'symmetric bend'},
+    ]
+  },
+  {
+    id:'ch_sp2_stretch', name:'=C–H stretch (sp²)', shortName:'=C–H stretch',
+    color:'#795548',
+    peaks:[
+      {wn:3080, intensity:0.50, label:'=C–H stretch (sp²)', type:'stretch'},
+    ]
+  },
+  {
+    id:'ch_sp2_oop', name:'=C–H oop bend (sp²)', shortName:'=C–H oop',
+    color:'#795548',
+    peaks:[
+      {wn:1000, intensity:0.65, label:'=C–H oop bend (sp²)', type:'out-of-plane bend'},
+    ]
+  },
+  {
+    id:'ch_sp', name:'C–H (sp, alkyne)', shortName:'C–H sp (≡C–H)',
+    color:'#4e342e',
+    peaks:[
+      {wn:3300, intensity:0.75, label:'≡C–H stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'cc_double', name:'C=C (alkene)', shortName:'C=C alkene',
+    color:'#4caf50',
+    peaks:[
+      {wn:1640, intensity:0.50, label:'C=C stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'cc_triple', name:'C≡C (alkyne)', shortName:'C≡C alkyne',
+    color:'#66bb6a',
+    peaks:[
+      {wn:2200, intensity:0.40, label:'C≡C stretch', type:'stretch'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // AROMÁTICOS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'cc_aromatic', name:'C=C (aromatic)', shortName:'Ar C=C',
+    color:'#2e7d32',
+    peaks:[
+      {wn:1600, intensity:0.60, label:'C=C stretch (aromatic)', type:'ring stretch'},
+      {wn:1500, intensity:0.65, label:'C=C stretch (aromatic)', type:'ring stretch'},
+      {wn:1450, intensity:0.45, label:'C=C stretch (aromatic)', type:'ring stretch'},
+    ]
+  },
+  {
+    id:'ar_mono', name:'Aromatic (monosubstituted)', shortName:'Ar-H (mono)',
+    color:'#1b5e20',
+    peaks:[
+      {wn:3080, intensity:0.40, label:'=C–H stretch (aryl)', type:'stretch'},
+      {wn:1600, intensity:0.55, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1500, intensity:0.60, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1450, intensity:0.40, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:750, intensity:0.90, label:'=C–H oop bend (5 H adj.)', type:'out-of-plane bend (strong)'},
+      {wn:690, intensity:0.85, label:'=C–H oop bend (mono)', type:'out-of-plane bend (strong)'},
+    ]
+  },
+  {
+    id:'ar_ortho', name:'Aromatic (ortho-disubstituted)', shortName:'Ar-H (o-)',
+    color:'#2e7d32',
+    peaks:[
+      {wn:3080, intensity:0.35, label:'=C–H stretch (aryl)', type:'stretch'},
+      {wn:1600, intensity:0.50, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1500, intensity:0.55, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1450, intensity:0.35, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:750, intensity:0.95, label:'=C–H oop bend (4 H adj.)', type:'out-of-plane bend (very strong)'},
+    ]
+  },
+  {
+    id:'ar_meta', name:'Aromatic (meta-disubstituted)', shortName:'Ar-H (m-)',
+    color:'#388e3c',
+    peaks:[
+      {wn:3080, intensity:0.35, label:'=C–H stretch (aryl)', type:'stretch'},
+      {wn:1600, intensity:0.50, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1500, intensity:0.55, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1450, intensity:0.35, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:880, intensity:0.60, label:'=C–H oop bend (1 H isolated)', type:'out-of-plane bend (medium)'},
+      {wn:780, intensity:0.85, label:'=C–H oop bend (3 H adj.)', type:'out-of-plane bend (strong)'},
+      {wn:690, intensity:0.75, label:'=C–H oop bend (meta)', type:'out-of-plane bend (strong)'},
+    ]
+  },
+  {
+    id:'ar_para', name:'Aromatic (para-disubstituted)', shortName:'Ar-H (p-)',
+    color:'#43a047',
+    peaks:[
+      {wn:3080, intensity:0.35, label:'=C–H stretch (aryl)', type:'stretch'},
+      {wn:1600, intensity:0.50, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1500, intensity:0.55, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:1450, intensity:0.35, label:'C=C stretch (ring)', type:'ring stretch'},
+      {wn:820, intensity:0.95, label:'=C–H oop bend (2 H adj.)', type:'out-of-plane bend (very strong)'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // ALCENOS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'terminal_alkene', name:'Terminal alkene (=CH₂)', shortName:'Terminal alkene',
+    color:'#66bb6a',
+    peaks:[
+      {wn:990, intensity:0.75, label:'=C–H oop bend (terminal)', type:'out-of-plane bend (strong)'},
+      {wn:910, intensity:0.80, label:'=C–H oop bend (terminal)', type:'out-of-plane bend (strong)'},
+    ]
+  },
+  {
+    id:'trans_alkene', name:'trans-Alkene', shortName:'trans-Alkene',
+    color:'#81c784',
+    peaks:[
+      {wn:965, intensity:0.80, label:'=C–H oop bend (trans)', type:'out-of-plane bend (strong)'},
+    ]
+  },
+  {
+    id:'cis_alkene', name:'cis-Alkene', shortName:'cis-Alkene',
+    color:'#a5d6a7',
+    peaks:[
+      {wn:700, intensity:0.80, label:'=C–H oop bend (cis)', type:'out-of-plane bend (strong)'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // HALOGÊNIOS
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'cf', name:'C–F', shortName:'C–F',
+    color:'#00bcd4',
+    peaks:[
+      {wn:1050, intensity:0.85, label:'C–F stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'ccl', name:'C–Cl', shortName:'C–Cl',
+    color:'#009688',
+    peaks:[
+      {wn:730, intensity:0.80, label:'C–Cl stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'cbr', name:'C–Br', shortName:'C–Br',
+    color:'#004d40',
+    peaks:[
+      {wn:600, intensity:0.75, label:'C–Br stretch', type:'stretch'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // ENXOFRE
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'sulfoxide', name:'S=O (sulfoxide)', shortName:'Sulfoxide',
+    color:'#ff6f00',
+    peaks:[
+      {wn:1050, intensity:0.95, label:'S=O stretch (sulfoxide)', type:'stretch'},
+    ]
+  },
+  {
+    id:'sulfone', name:'S=O (sulfone)', shortName:'Sulfone',
+    color:'#e65100',
+    peaks:[
+      {wn:1310, intensity:0.95, label:'S=O asym. stretch (sulfone)', type:'asymmetric stretch'},
+      {wn:1140, intensity:0.95, label:'S=O sym. stretch (sulfone)', type:'symmetric stretch'},
+    ]
+  },
+  {
+    id:'so2', name:'S=O (sulfonyl)', shortName:'S=O sulfonyl',
+    color:'#ff5722',
+    peaks:[
+      {wn:1200, intensity:0.90, label:'S=O stretch', type:'stretch'},
+      {wn:1050, intensity:0.80, label:'S=O stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'thioether', name:'C–S (thioether)', shortName:'C–S',
+    color:'#bf8f00',
+    peaks:[
+      {wn:700, intensity:0.50, label:'C–S stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'sh', name:'S–H (thiol)', shortName:'S–H',
+    color:'#8d6e63',
+    peaks:[
+      {wn:2570, intensity:0.30, label:'S–H stretch', type:'stretch'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // FÓSFORO
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'ph', name:'P–H', shortName:'P–H',
+    color:'#607d8b',
+    peaks:[
+      {wn:2400, intensity:0.50, label:'P–H stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'po', name:'P=O', shortName:'P=O',
+    color:'#546e7a',
+    peaks:[
+      {wn:1200, intensity:0.85, label:'P=O stretch', type:'stretch'},
+    ]
+  },
+  {
+    id:'phosphate_ester', name:'Phosphate ester', shortName:'Phosphate',
+    color:'#37474f',
+    peaks:[
+      {wn:1250, intensity:0.95, label:'P=O stretch (phosphate)', type:'stretch'},
+      {wn:1030, intensity:0.80, label:'P–O–C stretch', type:'stretch'},
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SILÍCIO
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id:'si_o', name:'Si–O (siloxane)', shortName:'Si–O',
+    color:'#90a4ae',
+    peaks:[
+      {wn:1100, intensity:0.95, label:'Si–O stretch', type:'stretch'},
+      {wn:800,  intensity:0.60, label:'Si–O–Si bend', type:'bend'},
+    ]
+  },
+];
+
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
+let activeGroups = []; // {id, dbEntry, intensity (0-100), color, hidden, peakShifts: {index: shift}}
+let selectedInPicker = new Set();
+let displayMode = 'combined';
+
+// ════════════════════════════════════════════════════════════════
+// MODE CONTROL
+// ════════════════════════════════════════════════════════════════
+function setMode(mode){
+  displayMode = mode;
+  document.getElementById('modeCombined').className = 'mode-btn' + (mode === 'combined' ? ' active' : '');
+  document.getElementById('modeSparate').className = 'mode-btn' + (mode === 'sparate' ? ' active' : '');
+  drawIR();
+  notify(mode === 'combined' ? 'Combined mode' : 'Sparated mode');
+}
+
+// ════════════════════════════════════════════════════════════════
+// OPEN/CLOSE MODALS
+// ════════════════════════════════════════════════════════════════
+function openAbsTable(){
+  buildAbsTable();
+  document.getElementById('modalAbs').classList.add('on');
+}
+function openAddFG(){
+  selectedInPicker.clear();
+  buildFGPicker();
+  document.getElementById('modalAddFG').classList.add('on');
+}
+function confirmAddFG(){
+  selectedInPicker.forEach(id=>{
+    if(activeGroups.find(g=>g.id===id)) return;
+    const db = IR_DB.find(d=>d.id===id);
+    if(!db) return;
+    // Inicializa peakShifts com 0 para cada pico
+    const peakShifts = {};
+    db.peaks.forEach((_, idx) => { peakShifts[idx] = 0; });
+    activeGroups.push({id, dbEntry:db, intensity:100, color:db.color, hidden:false, peakShifts});
+  });
+  document.getElementById('modalAddFG').classList.remove('on');
+  renderFGList();
+  drawIR();
+  notify(`Added ${selectedInPicker.size} group(s) to spectrum`);
+}
+
+// ════════════════════════════════════════════════════════════════
+// BUILD PICKER
+// ════════════════════════════════════════════════════════════════
+function buildFGPicker(){
+  const el = document.getElementById('fgPicker');
+  el.innerHTML = '';
+  IR_DB.forEach(db=>{
+    const already = !!activeGroups.find(g=>g.id===db.id);
+    const div = document.createElement('div');
+    div.className = 'fg-opt' + (already?' fg-opt-dim':'') + (selectedInPicker.has(db.id)?' fg-opt-sel':'');
+    div.style.borderColor = selectedInPicker.has(db.id) ? db.color : '';
+    div.style.background  = selectedInPicker.has(db.id) ? db.color+'18' : '';
+    div.innerHTML = `<span class="dot" style="background:${db.color}"></span>${db.name}${already?' <span style="color:var(--accent3);font-size:8px">(active)</span>':''}`;
+    div.onclick = ()=>{
+      if(already) return;
+      if(selectedInPicker.has(db.id)) selectedInPicker.delete(db.id);
+      else selectedInPicker.add(db.id);
+      buildFGPicker();
+    };
+    el.appendChild(div);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER FUNCTIONAL GROUP LIST IN SIDEBAR
+// ════════════════════════════════════════════════════════════════
+function renderFGList(){
+  const el = document.getElementById('fgList');
+  el.innerHTML = '';
+  activeGroups.forEach((g,i)=>{
+    const db = g.dbEntry;
+    const peaksDesc = db.peaks.filter(p=>p.wn>=500&&p.wn<=4000)
+      .map(p=>`${p.wn} cm⁻¹`).join(', ');
+    const card = document.createElement('div');
+    card.className = 'fg-card' + (g.hidden ? ' hidden' : '');
+    card.style.borderLeft = `3px solid ${g.color}`;
+
+    const toggleIcon = g.hidden ? '👁️‍🗨️' : '👁️';
+    const toggleTitle = g.hidden ? 'Mostrar Group' : 'Ocultar Group';
+
+    // Monta os controles de shift para cada pico
+    let peakShiftsHtml = '';
+    db.peaks.forEach((pk, pIdx) => {
+      const shiftVal = g.peakShifts && g.peakShifts[pIdx] !== undefined ? g.peakShifts[pIdx] : 0;
+      peakShiftsHtml += `
+        <div class="pk-shift-row">
+          <div class="pk-shift-header">
+            <span class="pk-mode-label">${pk.type}</span>
+            <span><span class="pk-wn">${pk.wn}</span> cm⁻¹</span>
+          </div>
+          <div class="pk-shift-controls">
+            <input type="range" min="-500" max="500" step="1" value="${shiftVal}"
+              style="accent-color:${g.color}"
+              oninput="activeGroups[${i}].peakShifts[${pIdx}]=+this.value;document.getElementById('pkShift${i}_${pIdx}').textContent=this.value;drawIR()">
+            <span class="pk-shift-num" id="pkShift${i}_${pIdx}">${shiftVal}</span>
+            <button class="pk-shift-reset" onclick="activeGroups[${i}].peakShifts[${pIdx}]=0;document.getElementById('pkShift${i}_${pIdx}').textContent='0';this.parentElement.querySelector('input[type=range]').value=0;drawIR()" title="Reset shift">↺</button>
+          </div>
+        </div>
+      `;
+    });
+
+    card.innerHTML = `
+      <div class="fg-head">
+        <span class="fg-swatch ${g.hidden ? 'hidden-swatch' : ''}" style="background:${g.color}"></span>
+        <span class="fg-name">${db.name}${g.hidden ? ' (oculto)' : ''}</span>
+        <div class="fg-actions">
+          <button class="fg-toggle ${g.hidden ? 'hidden-toggle' : ''}" onclick="toggleFG(${i})" title="${toggleTitle}">${toggleIcon}</button>
+          <button class="fg-rm" onclick="removeFG(${i})" title="Remover Group">✕</button>
+        </div>
+      </div>
+      <div class="fg-peaks-info">${peaksDesc}</div>
+      <div class="fg-intensity-row">
+        <label>Intensity</label>
+        <input type="range" min="0" max="100" value="${g.intensity}" 
+          style="accent-color:${g.color}"
+          oninput="activeGroups[${i}].intensity=+this.value;document.getElementById('fgInt${i}').textContent=this.value;drawIR()">
+        <span class="fg-int-num" id="fgInt${i}" style="font-family:var(--mono);font-size:10px;color:var(--text3)">${g.intensity}%</span>
+      </div>
+      <!-- Controles de shift por pico -->
+      <div style="margin-top:4px;font-family:var(--mono);font-size:8px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding-left:12px">Wavelength shift per peak</div>
+      ${peakShiftsHtml}
+    `;
+    el.appendChild(card);
+  });
+
+  const visibleGroups = activeGroups.filter(g => !g.hidden).length;
+  document.getElementById('fgCount').textContent = activeGroups.length + ' bound' + (activeGroups.length!==1?'s':'') + ' active' + 
+    (activeGroups.filter(g=>g.hidden).length > 0 ? ` (${activeGroups.filter(g=>g.hidden).length} oculto${activeGroups.filter(g=>g.hidden).length!==1?'s':''})` : '');
+}
+
+function toggleFG(i){
+  activeGroups[i].hidden = !activeGroups[i].hidden;
+  renderFGList();
+  drawIR();
+  notify(activeGroups[i].hidden ? 
+    `Group "${activeGroups[i].dbEntry.name}" hidden` : 
+    `Group "${activeGroups[i].dbEntry.name}" visible`);
+}
+
+function removeFG(i){
+  const name = activeGroups[i].dbEntry.name;
+  activeGroups.splice(i,1);
+  renderFGList();
+  drawIR();
+  notify(`Group "${name}" removido`, 'warn');
+}
+
+// ════════════════════════════════════════════════════════════════
+// BUILD ABSORPTION TABLE
+// ════════════════════════════════════════════════════════════════
+function buildAbsTable(){
+  const el = document.getElementById('absTableContent');
+  let html = `<table class="atbl"><thead><tr>
+    <th>Group / Bond</th><th>Wavenumber (cm⁻¹)</th><th>Intensity</th><th>Vibration Type</th>
+  </tr></thead><tbody>`;
+  IR_DB.forEach(db=>{
+    db.peaks.forEach((p,pi)=>{
+      const iStr = p.intensity>=0.85?'Very Strong':p.intensity>=0.65?'Strong':p.intensity>=0.45?'Medium':p.intensity>=0.25?'Weak':'Very Weak';
+      html += `<tr>
+        <td>${pi===0?`<span class="grp-color" style="background:${db.color}"></span>${db.name}`:''}</td>
+        <td>${p.wn} cm⁻¹</td>
+        <td>${iStr}</td>
+        <td>${p.type}</td>
+      </tr>`;
+    });
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════════
+// DRAW IR SPECTRUM
+// ════════════════════════════════════════════════════════════════
+const WN_MIN = 500;
+const WN_MAX = 4000;
+
+function drawIR(){
+  const canvas = document.getElementById('irCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const Pad = {l:62, r:30, t:55, b:80};
+  const pw = W - Pad.l - Pad.r;
+  const ph = H - Pad.t - Pad.b;
+  const noiseAmt = parseFloat(document.getElementById('irNoise').value);
+  const widthFactor = parseFloat(document.getElementById('irWidth').value);
+  const slope = parseFloat(document.getElementById('irSlope').value)||0;
+  const showAnnot = document.getElementById('showAnnot').checked;
+  const showGrid  = document.getElementById('showGrid').checked;
+  const showWN    = document.getElementById('showWavenum').checked;
+  const title     = document.getElementById('irTitle').value;
+  const yLabel    = document.getElementById('irYLabel').value;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,W,H);
+
+  const xFromWN = wn => Pad.l + (WN_MAX - wn)/(WN_MAX - WN_MIN) * pw;
+  const yFromT  = t  => Pad.t + (1 - t/100) * ph;
+
+  const nPoints = pw;
+  
+  if(showGrid){
+    ctx.strokeStyle='#e8eaed'; ctx.lineWidth=0.5;
+    for(let t=0;t<=100;t+=20){
+      const y = yFromT(t);
+      ctx.beginPath(); ctx.moveTo(Pad.l,y); ctx.lineTo(Pad.l+pw,y); ctx.stroke();
+    }
+    for(let wn=500;wn<=4000;wn+=500){
+      const x = xFromWN(wn);
+      ctx.beginPath(); ctx.moveTo(x,Pad.t); ctx.lineTo(x,Pad.t+ph); ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle='rgba(255,250,235,0.55)';
+  const xFP1 = xFromWN(1800), xFP2 = xFromWN(500);
+  ctx.fillRect(xFP1, Pad.t, xFP2-xFP1, ph);
+  ctx.font='8px "IBM Plex Mono"';
+  ctx.fillStyle='#c8a000';
+  ctx.textAlign='center';
+  ctx.fillText('FINGERPRINT', (xFP1+xFP2)/2, Pad.t+9);
+
+  ctx.strokeStyle='#2a3550'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(Pad.l, Pad.t);
+  ctx.lineTo(Pad.l, Pad.t+ph);
+  ctx.lineTo(Pad.l+pw, Pad.t+ph);
+  ctx.stroke();
+
+  ctx.font='10px "IBM Plex Mono"'; ctx.fillStyle='#5a6478';
+  for(let wn=4000;wn>=500;wn-=500){
+    const x = xFromWN(wn);
+    ctx.strokeStyle='#aab'; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(x, Pad.t+ph); ctx.lineTo(x, Pad.t+ph+5); ctx.stroke();
+    ctx.textAlign='center';
+    ctx.fillText(wn, x, Pad.t+ph+18);
+  }
+
+  ctx.textAlign='right';
+  for(let t=0;t<=100;t+=20){
+    const y = yFromT(t);
+    ctx.strokeStyle='#aab'; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(Pad.l-5,y); ctx.lineTo(Pad.l,y); ctx.stroke();
+    ctx.fillStyle='#5a6478';
+    ctx.fillText(t+'%', Pad.l-8, y+4);
+  }
+
+  const visibleGroups = activeGroups.filter(g => !g.hidden);
+
+  // Função que retorna os picos com shift individual por pico aplicado
+  const getShiftedPeaks = (g) => g.dbEntry.peaks.map((pk, idx) => ({
+    ...pk,
+    wn: pk.wn + ((g.peakShifts && g.peakShifts[idx]) || 0)
+  }));
+
+  if (displayMode === 'combined') {
+    const spectrum = new Float32Array(nPoints);
+    for(let i=0;i<nPoints;i++) spectrum[i] = 100;
+
+    visibleGroups.forEach(g=>{
+      const intScale = g.intensity / 100;
+      const peaks = getShiftedPeaks(g);
+      peaks.forEach(pk=>{
+        if(pk.wn < WN_MIN || pk.wn > WN_MAX) return;
+        let baseWidth = 20;
+        if(pk.type.includes('broad')) baseWidth = 80;
+        if(pk.type.includes('very broad')) baseWidth = 120;
+        const sigma = baseWidth * widthFactor;
+        const pkAbs = pk.intensity * intScale;
+
+        for(let i=0;i<nPoints;i++){
+          const wn = WN_MAX - (i/nPoints)*(WN_MAX - WN_MIN);
+          const gauss = pkAbs * Math.exp(-0.5*((wn - pk.wn)/sigma)**2);
+          const curA = -Math.log10(spectrum[i]/100 + 1e-10);
+          const newA = curA + gauss;
+          spectrum[i] = Math.pow(10, -newA) * 100;
+          if(spectrum[i] < 0) spectrum[i] = 0;
+        }
+      });
+    });
+
+    for(let i=0;i<nPoints;i++){
+      spectrum[i] += slope * (i/nPoints - 0.5);
+      spectrum[i] = Math.min(100, Math.max(0, spectrum[i]));
+    }
+
+    if(noiseAmt > 0){
+      for(let i=0;i<nPoints;i++){
+        spectrum[i] += (Math.random()-0.5)*2*noiseAmt;
+        spectrum[i] = Math.min(100, Math.max(0, spectrum[i]));
+      }
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(Pad.l, yFromT(spectrum[0]));
+    for(let i=1;i<nPoints;i++){
+      ctx.lineTo(Pad.l + i, yFromT(spectrum[i]));
+    }
+    ctx.lineTo(Pad.l+pw, Pad.t+ph);
+    ctx.lineTo(Pad.l, Pad.t+ph);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(26,95,180,0.06)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(Pad.l, yFromT(spectrum[0]));
+    for(let i=1;i<nPoints;i++){
+      ctx.lineTo(Pad.l + i, yFromT(spectrum[i]));
+    }
+    ctx.strokeStyle = '#1d4ed8';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    if(showAnnot || showWN){
+      const annotatedPeaks = [];
+      visibleGroups.forEach(g=>{
+        const intScale = g.intensity / 100;
+        const peaks = getShiftedPeaks(g);
+        peaks.forEach(pk=>{
+          if(pk.wn < WN_MIN || pk.wn > WN_MAX) return;
+          if(pk.intensity * intScale < 0.08) return;
+          const ixCenter = Math.round((WN_MAX - pk.wn)/(WN_MAX - WN_MIN) * nPoints);
+          const ixSearch = 30;
+          let minT = 100, minIx = ixCenter;
+          for(let ix=Math.max(0,ixCenter-ixSearch);ix<Math.min(nPoints,ixCenter+ixSearch);ix++){
+            if(spectrum[ix] < minT){ minT=spectrum[ix]; minIx=ix; }
+          }
+          const minX = Pad.l + minIx;
+          const minY = yFromT(minT);
+          annotatedPeaks.push({
+            x: minX, y: minY, wn: pk.wn,
+            label: pk.label, type: pk.type,
+            color: g.color, intScale
+          });
+        });
+      });
+
+      annotatedPeaks.forEach(ap=>{
+        ctx.strokeStyle = ap.color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3,2]);
+        ctx.beginPath();
+        ctx.moveTo(ap.x, ap.y);
+        ctx.lineTo(ap.x, ap.y - 22);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if(showWN){
+          ctx.font = 'bold 12px "IBM Plex Mono"';
+          ctx.fillStyle = ap.color;
+          ctx.textAlign = 'center';
+          ctx.fillText(ap.wn + ' cm⁻¹', ap.x, ap.y - 27);
+        }
+
+        if(showAnnot){
+          ctx.save();
+          ctx.translate(ap.x, ap.y - (showWN ? 38 : 26));
+          ctx.rotate(-Math.PI/2);
+          ctx.font = '12px "IBM Plex Sans"';
+          ctx.fillStyle = ap.color;
+          ctx.textAlign = 'left';
+          ctx.fillText(ap.label, 2, 3);
+          ctx.restore();
+        }
+      });
+    }
+
+    if(visibleGroups.length){
+      let lx = Pad.l + 10, ly = Pad.t + 12;
+      const legMaxCols = 3;
+      const colW = 200;
+      visibleGroups.forEach((g,i)=>{
+        const col = i % legMaxCols;
+        const row = Math.floor(i / legMaxCols);
+        const x = lx + col*colW;
+        const y = ly + row*13;
+        if(y > Pad.t + ph - 10) return;
+        ctx.fillStyle = g.color;
+        ctx.fillRect(x, y-5, 12, 7);
+        ctx.font = '9px "IBM Plex Sans"';
+        ctx.fillStyle = '#2a3550';
+        ctx.textAlign = 'left';
+        ctx.fillText(g.dbEntry.shortName, x+16, y+1);
+      });
+    }
+
+    const visiblePeaks = visibleGroups.reduce((s,g)=>s+g.dbEntry.peaks.filter(p=>p.wn>=500&&p.wn<=4000).length,0);
+    document.getElementById('infoGroups').textContent = `Groups: ${activeGroups.length} (${visibleGroups.length} visible${visibleGroups.length!==1?'':' '})`;
+    document.getElementById('infoPeaks').textContent = `Peaks: ${visiblePeaks}`;
+
+  } else {
+    const groupSpectra = [];
+    visibleGroups.forEach(g=>{
+      const spectrum = new Float32Array(nPoints);
+      for(let i=0;i<nPoints;i++) spectrum[i] = 100;
+      const intScale = g.intensity / 100;
+      const peaks = getShiftedPeaks(g);
+      peaks.forEach(pk=>{
+        if(pk.wn < WN_MIN || pk.wn > WN_MAX) return;
+        let baseWidth = 20;
+        if(pk.type.includes('broad')) baseWidth = 80;
+        if(pk.type.includes('very broad')) baseWidth = 120;
+        const sigma = baseWidth * widthFactor;
+        const pkAbs = pk.intensity * intScale;
+
+        for(let i=0;i<nPoints;i++){
+          const wn = WN_MAX - (i/nPoints)*(WN_MAX - WN_MIN);
+          const gauss = pkAbs * Math.exp(-0.5*((wn - pk.wn)/sigma)**2);
+          const curA = -Math.log10(spectrum[i]/100 + 1e-10);
+          const newA = curA + gauss;
+          spectrum[i] = Math.pow(10, -newA) * 100;
+          if(spectrum[i] < 0) spectrum[i] = 0;
+        }
+      });
+      for(let i=0;i<nPoints;i++){
+        spectrum[i] += slope * (i/nPoints - 0.5);
+        spectrum[i] = Math.min(100, Math.max(0, spectrum[i]));
+      }
+      if(noiseAmt > 0){
+        for(let i=0;i<nPoints;i++){
+          spectrum[i] += (Math.random()-0.5)*2*noiseAmt;
+          spectrum[i] = Math.min(100, Math.max(0, spectrum[i]));
+        }
+      }
+      groupSpectra.push({group: g, spectrum});
+    });
+
+    groupSpectra.forEach((gs, idx)=>{
+      const color = gs.group.color;
+      ctx.beginPath();
+      ctx.moveTo(Pad.l, yFromT(gs.spectrum[0]));
+      for(let i=1;i<nPoints;i++){
+        ctx.lineTo(Pad.l + i, yFromT(gs.spectrum[i]));
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.85;
+      ctx.stroke();
+      ctx.globalAlpha = 1.0;
+    });
+
+    if(showAnnot || showWN){
+      const annotatedPeaks = [];
+      visibleGroups.forEach(g=>{
+        const intScale = g.intensity / 100;
+        const peaks = getShiftedPeaks(g);
+        peaks.forEach(pk=>{
+          if(pk.wn < WN_MIN || pk.wn > WN_MAX) return;
+          if(pk.intensity * intScale < 0.08) return;
+          const x = xFromWN(pk.wn);
+          const ixCenter = Math.round((WN_MAX - pk.wn)/(WN_MAX - WN_MIN) * nPoints);
+          const ixSearch = 25;
+          let minT = 100, minIx = ixCenter;
+          const gs = groupSpectra.find(gs=>gs.group.id === g.id);
+          if(gs){
+            for(let ix=Math.max(0,ixCenter-ixSearch);ix<Math.min(nPoints,ixCenter+ixSearch);ix++){
+              if(gs.spectrum[ix] < minT){ minT=gs.spectrum[ix]; minIx=ix; }
+            }
+          }
+          const minX = Pad.l + minIx;
+          const minY = yFromT(minT);
+          annotatedPeaks.push({
+            x: minX, y: minY, wn: pk.wn,
+            label: pk.label, type: pk.type,
+            color: g.color, intScale
+          });
+        });
+      });
+
+      annotatedPeaks.forEach(ap=>{
+        ctx.strokeStyle = ap.color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2,3]);
+        ctx.beginPath();
+        ctx.moveTo(ap.x, ap.y);
+        ctx.lineTo(ap.x, ap.y - 18);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if(showWN){
+          ctx.font = 'bold 12px "IBM Plex Mono"';
+          ctx.fillStyle = ap.color;
+          ctx.textAlign = 'center';
+          ctx.fillText(ap.wn, ap.x, ap.y - 22);
+        }
+
+        if(showAnnot){
+          ctx.save();
+          ctx.translate(ap.x, ap.y - (showWN ? 30 : 20));
+          ctx.rotate(-Math.PI/2);
+          ctx.font = '12px "IBM Plex Sans"';
+          ctx.fillStyle = ap.color;
+          ctx.textAlign = 'left';
+          ctx.fillText(ap.label, 2, 3);
+          ctx.restore();
+        }
+      });
+    }
+
+    if(visibleGroups.length){
+      let lx = Pad.l + 10, ly = Pad.t + 12;
+      const legMaxCols = 3;
+      const colW = 200;
+      visibleGroups.forEach((g,i)=>{
+        const col = i % legMaxCols;
+        const row = Math.floor(i / legMaxCols);
+        const x = lx + col*colW;
+        const y = ly + row*13;
+        if(y > Pad.t + ph - 10) return;
+        ctx.fillStyle = g.color;
+        ctx.fillRect(x, y-5, 12, 7);
+        ctx.font = '9px "IBM Plex Sans"';
+        ctx.fillStyle = '#2a3550';
+        ctx.textAlign = 'left';
+        ctx.fillText(g.dbEntry.shortName, x+16, y+1);
+      });
+    }
+
+    const visiblePeaks = visibleGroups.reduce((s,g)=>s+g.dbEntry.peaks.filter(p=>p.wn>=500&&p.wn<=4000).length,0);
+    document.getElementById('infoGroups').textContent = `Groups: ${activeGroups.length} (${visibleGroups.length} visible${visibleGroups.length!==1?'':' '}) · Sparate`;
+    document.getElementById('infoPeaks').textContent = `Peaks: ${visiblePeaks}`;
+  }
+
+  ctx.fillStyle='#1a2744';
+  ctx.font='bold 14px "IBM Plex Sans"';
+  ctx.textAlign='center';
+  ctx.fillText(title, Pad.l + pw/2, 28);
+
+  ctx.fillStyle='#2a3550';
+  ctx.font='11px "IBM Plex Sans"';
+  ctx.textAlign='center';
+  ctx.fillText('Wavenumber (cm⁻¹)', Pad.l + pw/2, H - 12);
+
+  ctx.save();
+  ctx.translate(14, Pad.t + ph/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+}
+
+// ════════════════════════════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════════════════════════════
+function exportPNG(){
+  const a = document.createElement('a');
+  a.href = document.getElementById('irCanvas').toDataURL('image/png');
+  a.download = 'IR_Spectrum.png';
+  a.click();
+  notify('PNG downloaded!');
+}
+function exportCSV(){
+  const canvas = document.getElementById('irCanvas');
+  const W = canvas.width;
+  const Pad = {l:62, r:30};
+  const pw = W - Pad.l - Pad.r;
+  const noiseAmt = parseFloat(document.getElementById('irNoise').value);
+  const widthFactor = parseFloat(document.getElementById('irWidth').value);
+  const slope = parseFloat(document.getElementById('irSlope').value)||0;
+  const nPoints = pw;
+  const spectrum = new Float32Array(nPoints);
+  for(let i=0;i<nPoints;i++) spectrum[i]=100;
+  const visibleGroups = activeGroups.filter(g => !g.hidden);
+  visibleGroups.forEach(g=>{
+    const intScale = g.intensity/100;
+    g.dbEntry.peaks.forEach((pk, idx)=>{
+      const shift = (g.peakShifts && g.peakShifts[idx]) || 0;
+      const wnShifted = pk.wn + shift;
+      if(wnShifted<WN_MIN||wnShifted>WN_MAX) return;
+      let baseWidth=20;
+      if(pk.type.includes('broad')) baseWidth=80;
+      if(pk.type.includes('very broad')) baseWidth=120;
+      const sigma=baseWidth*widthFactor;
+      const pkAbs=pk.intensity*intScale;
+      for(let i=0;i<nPoints;i++){
+        const wn=WN_MAX-(i/nPoints)*(WN_MAX-WN_MIN);
+        const gauss=pkAbs*Math.exp(-0.5*((wn-wnShifted)/sigma)**2);
+        const curA=-Math.log10(spectrum[i]/100+1e-10);
+        spectrum[i]=Math.pow(10,-(curA+gauss))*100;
+        if(spectrum[i]<0) spectrum[i]=0;
+      }
+    });
+  });
+  for(let i=0;i<nPoints;i++){
+    spectrum[i]+=slope*(i/nPoints-0.5);
+    spectrum[i]=Math.min(100,Math.max(0,spectrum[i]));
+  }
+  let csv='Wavenumber_cm-1;Transmittance_%\n';
+  for(let i=0;i<nPoints;i++){
+    const wn=(WN_MAX-(i/nPoints)*(WN_MAX-WN_MIN)).toFixed(1);
+    csv+=`${wn};${spectrum[i].toFixed(2)}\n`;
+  }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/plain'}));
+  a.download='IR_Spectrum.csv';
+  a.click();
+  notify('CSV downloaded!');
+}
+
+// ════════════════════════════════════════════════════════════════
+// NOTIFY
+// ════════════════════════════════════════════════════════════════
+function notify(msg,type='ok'){
+  const el=document.getElementById('notif');
+  el.textContent=msg;
+  el.className=type==='warn'?'show warn':type==='danger'?'show danger':'show';
+  setTimeout(()=>el.className='',2800);
+}
+
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  const defaults = ['ch_sp3', 'oh_alcohol', 'co_ketone', 'ar_mono', 'co_ester_carbonyl'];
+  defaults.forEach(id=>{
+    const db = IR_DB.find(d=>d.id===id);
+    if(db){
+      const peakShifts = {};
+      db.peaks.forEach((_, idx) => { peakShifts[idx] = 0; });
+      activeGroups.push({id, dbEntry:db, intensity:100, color:db.color, hidden:false, peakShifts});
+    }
+  });
+  renderFGList();
+  drawIR();
+
+  ['showAnnot','showGrid','showWavenum'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', drawIR);
+  });
+  document.getElementById('irTitle').addEventListener('input', drawIR);
+  document.getElementById('irYLabel').addEventListener('input', drawIR);
+
+  document.querySelectorAll('.modal-bg').forEach(bg=>{
+    bg.addEventListener('click', e=>{ if(e.target===bg) bg.classList.remove('on'); });
+  });
+});
+</script>
+</body>
+</html>
