@@ -1,0 +1,185 @@
+# 📊 Virtual IR
+
+**Virtual IR** is an interactive, browser-based infrared spectrum simulator for chemistry education. It allows users to compose IR spectra by combining functional groups and bonds, with real-time rendering and fine-grained signal control — all in a single self-contained HTML file, with no installation required.
+
+---
+
+## ✨ Features
+
+- **Functional Group Library** — over 50 bonds and functional groups organized by chemical class (O-containing, N-containing, carbonyls, aromatics, alkenes, halogens, sulfur, phosphorus, etc.)
+- **Combined & Separate View Modes** — visualize all active groups overlaid on a single spectrum, or display each group as an individual stacked trace
+- **Per-group Controls**
+  - Intensity slider (0–100%)
+  - Individual peak shift per absorption band (±200 cm⁻¹)
+  - Visibility toggle (show/hide without removing)
+  - Color-coded identification
+- **Signal Quality Controls**
+  - Noise / S·N⁻¹ (0–8%)
+  - Baseline slope adjustment
+  - Peak width factor (0.4×–3.0×)
+- **Display Options**
+  - Custom chart title and Y-axis label
+  - Peak wavenumber labels
+  - Grid overlay
+  - Peak annotation labels
+- **IR Absorption Reference Table** — searchable modal with absorption ranges, intensities, and bond assignments for all included functional groups
+- **Export**
+  - PNG image (high-resolution canvas export)
+  - CSV (Wavenumber vs. Transmittance data, semicolon-delimited)
+- **Zero dependencies** — fully self-contained single HTML file; runs entirely in the browser
+
+---
+
+## 🚀 Getting Started
+
+No installation or server required. Simply open the file in any modern browser:
+
+```
+double-click Virtual_IR.html
+```
+
+Or serve locally:
+
+```bash
+python3 -m http.server
+# then open http://localhost:8000/Virtual_IR.html
+```
+
+---
+
+## 🖥️ Interface Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  VIRTUAL IR                         [ABSORPTION TABLE] [↓PNG] [↓CSV]  │
+├───────────────────┬─────────────────────────────────────────┤
+│  LEFT SIDEBAR     │  CANVAS AREA                            │
+│  ─────────────    │  ─────────────────────────────────────  │
+│  Functional       │  [Combined] [Separate]   info bar       │
+│  Groups / Bonds   │                                         │
+│                   │  ┌─────────────────────────────────┐   │
+│  Signal Quality   │  │                                 │   │
+│                   │  │       IR Spectrum Canvas        │   │
+│  Spectrum Display │  │      4000 → 500  cm⁻¹         │   │
+│                   │  └─────────────────────────────────┘   │
+│  [UPDATE]         │                                         │
+└───────────────────┴─────────────────────────────────────────┘
+```
+
+### Left Sidebar
+
+| Section | Controls |
+|---|---|
+| **Functional Groups / Bonds** | Add, remove, toggle visibility, adjust intensity and per-peak shifts |
+| **Signal Quality** | Noise level, baseline slope, peak width factor |
+| **Spectrum Display** | Title, Y-axis label, grid, peak labels, wavenumber annotations |
+| **Update** | Manually re-render the spectrum |
+
+### Canvas Area
+
+- **Combined mode** — all active (visible) functional groups rendered as a single composite IR spectrum
+- **Separate mode** — each group displayed as its own stacked trace, color-matched to its sidebar card
+- Info bar shows active group count, visible peak count, and wavenumber range
+
+---
+
+## 🧪 Functional Group Database
+
+Groups are organized into chemical classes:
+
+| Class | Examples |
+|---|---|
+| **Oxygen** | O–H (free, alcohol, phenol, acid), C–O (alcohol, ether, ester, epoxide), C=O (acid, ketone, aldehyde, ester, anhydride, acyl chloride) |
+| **Nitrogen** | N–H (primary/secondary amine, amide), C≡N (nitrile), N=O (nitro) |
+| **Carbon** | C–H (sp³, sp², sp), C=C (alkene), C≡C (alkyne) |
+| **Aromatics** | Mono-, ortho-, meta-, para-disubstituted; Ar C=C ring stretches |
+| **Alkenes** | Terminal (=CH₂), trans-, cis- |
+| **Halogens** | C–F, C–Cl, C–Br |
+| **Sulfur** | S=O (sulfoxide, sulfone, sulfonyl), C–S (thioether), S–H (thiol) |
+| **Phosphorus** | P=O, P–O–C, P–OH |
+| **Silicon** | Si–H, Si–O–C |
+
+Each entry includes:
+- Absorption wavenumber(s) in cm⁻¹
+- Relative intensity
+- Band label and vibration type (stretch, bend, oop bend, etc.)
+
+---
+
+## 📐 Technical Details
+
+- **Rendering** — HTML5 Canvas 2D API; Gaussian peak model with configurable σ (width factor)
+- **Spectrum range** — 4000–1000 cm⁻¹ (transmittance mode)
+- **Broad peaks** — O–H, N–H, and acid bands use widened Gaussian profiles automatically
+- **Peak shift** — per-band ±200 cm⁻¹ offset, applied at render time
+- **Fonts** — IBM Plex Mono + IBM Plex Sans (loaded from Google Fonts)
+- **Canvas resolution** — 1100 × 560 px (PNG export at native canvas resolution)
+- **CSV format** — `Wavenumber_cm-1;Transmittance_%` (semicolon delimiter, two decimal places)
+
+---
+
+## 📦 File Structure
+
+```
+Virtual_IR.html       # Single self-contained file
+                      # Includes: CSS, HTML layout, IR database (JS), 
+                      #           rendering engine, export functions
+```
+
+---
+
+## 🎓 Use Cases
+
+- **Organic chemistry education** — visualize and compare characteristic absorptions of functional groups
+- **Spectral interpretation practice** — build a spectrum from known groups and challenge students to identify them
+- **Lecture and presentation aid** — export publication-ready PNG spectra
+- **Quick reference** — use the built-in absorption table as a concise IR correlation chart
+- **Lab report supplement** — export CSV data for plotting in external software
+
+---
+
+## 📤 Exporting
+
+### PNG
+Click **↓ PNG** in the header. Saves `IR_Spectrum.png` at full canvas resolution (1100 × 560 px).
+
+### CSV
+Click **↓ CSV** in the header. Saves `IR_Spectrum.csv` with columns:
+
+```
+Wavenumber_cm-1;Transmittance_%
+4000.0;99.87
+3999.0;99.91
+...
+```
+
+Compatible with Excel, Origin, Python (pandas/matplotlib), and R.
+
+---
+
+## 🛠️ Customization
+
+To add new functional groups, extend the `IR_DB` array in the `<script>` section:
+
+```javascript
+{
+  id: 'my_group',
+  name: 'My Bond Name',
+  shortName: 'Short Label',
+  color: '#hex',
+  peaks: [
+    { wn: 1750, intensity: 0.95, label: 'My stretch', type: 'stretch' },
+  ]
+}
+```
+
+Peak `type` strings control band width:
+- `'stretch'` — default width
+- `'stretch, broad'` — broad Gaussian (σ × 4)
+- `'stretch, very broad'` — very broad Gaussian (σ × 6)
+
+---
+
+## 👤 Author
+
+**João Victor Basolli Borsatto** · 2026
